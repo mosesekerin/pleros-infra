@@ -32,7 +32,10 @@ jobs:
           sudo apt-get install -y -qq postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}"
-          pg_dump --version
+          PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+          echo "$PG_BIN" >> "$GITHUB_PATH"
+          "$PG_BIN/pg_dump" --version | grep -q " ${PG_MAJOR}\." || { echo "::error::pg_dump ${PG_MAJOR} not found"; exit 1; }
+          "$PG_BIN/pg_dump" --version
 
       - name: Dump database
         env:
