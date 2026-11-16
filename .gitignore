@@ -1,0 +1,8 @@
+# secrets: only the ENCRYPTED vault.yml is ever committed (Makefile checks this)
+*.vault-pass
+.vault-pass*
+.env
+.env.*
+*.retry
+__pycache__/
+.ansible/

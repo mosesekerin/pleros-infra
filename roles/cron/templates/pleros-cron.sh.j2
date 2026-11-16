@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Usage: pleros-cron /api/cron/<job>    Logs go to syslog:  journalctl -t pleros-cron
+set -uo pipefail
+# shellcheck disable=SC1091
+. /etc/pleros/cron.env
+path="${1:?usage: pleros-cron /api/cron/<job>}"
+out=$(mktemp)
+trap 'rm -f "$out"' EXIT
+code=$(curl -sS -o "$out" -w '%{http_code}' --max-time 300 \
+  -H "Authorization: Bearer ${CRON_SECRET}" \
+  "http://127.0.0.1:{{ app_port }}${path}") || code="curl-error"
+if [[ "$code" =~ ^2 ]]; then
+  logger -t pleros-cron "ok path=${path} status=${code}"
+else
+  logger -t pleros-cron -p user.err "FAILED path=${path} status=${code} body=$(head -c 300 "$out" | tr '\n' ' ')"
+  exit 1
+fi

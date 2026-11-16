@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+# {{ ansible_managed }}
+# Builds the Pleros Next.js app exactly as on Vercel (npm ci + npm run build), no app code changes.
+
+FROM {{ app_node_image }} AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+# The build connects to the database, so it needs the env vars. They are mounted as a
+# build secret: available during this step only, never stored in an image layer.
+RUN --mount=type=secret,id=app_env,target=/app/.env.production.local npm run build
+
+FROM {{ app_node_image }} AS run
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+COPY --from=build --chown=node:node /app ./
+USER node
+EXPOSE {{ app_port }}
+CMD ["node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "{{ app_port }}"]

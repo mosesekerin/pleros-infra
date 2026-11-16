@@ -1,0 +1,17 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ansible-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse an unencrypted vault
+        run: make vault-check
+      - name: Install ansible + ansible-lint
+        run: pip install ansible ansible-lint
+      - name: Lint (no secrets needed)
+        run: ansible-lint

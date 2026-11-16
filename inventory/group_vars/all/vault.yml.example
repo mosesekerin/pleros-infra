@@ -1,0 +1,61 @@
+---
+# TEMPLATE ONLY. Real values go in vault.yml, which is encrypted:
+#   cp inventory/group_vars/all/vault.yml.example inventory/group_vars/all/vault.yml
+#   make vault-edit        (fill in values, save)   ->   make vault-encrypt
+# Every key under vault_app_env becomes a line in the app's .env on the server.
+
+vault_app_env:
+  # --- core ---
+  NODE_ENV: production
+  VERCEL_ENV: production # the code reads this; Vercel set it automatically. Confirm with Olamide what it controls.
+  DATABASE_URL: ""
+  DATABASE_URL_UNPOOLED: ""
+  NEXT_PUBLIC_APP_URL: https://pleros.org
+  NEXT_PUBLIC_SITE_URL: https://pleros.org
+  NEXT_PUBLIC_PUBLIC_SITE_URL: https://pleros.org
+  # --- auth ---
+  BETTER_AUTH_SECRET: ""
+  BETTER_AUTH_URL: https://pleros.org
+  GOOGLE_CLIENT_ID: ""
+  GOOGLE_CLIENT_SECRET: ""
+  NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ""
+  SUPER_ADMIN_EMAILS: ""
+  # --- cron ---
+  CRON_SECRET: ""
+  # --- email ---
+  RESEND_API_KEY: ""
+  EMAIL_FROM: ""
+  EMAIL_FROM_PLEROS: ""
+  # --- payments ---
+  NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ""
+  PAYSTACK_SECRET_KEY: ""
+  # --- google services ---
+  GOOGLE_SERVICE_ACCOUNT_CREDENTIALS: "" # JSON on one line
+  FIRST_TIME_WORSHIPPERS_SHEET_ID: ""
+  YOUTUBE_API_KEY: ""
+  NEXT_PUBLIC_GA_MEASUREMENT_ID: ""
+  # --- push notifications ---
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: ""
+  VAPID_PRIVATE_KEY: ""
+  VAPID_SUBJECT: ""
+  # --- uploads / media ---
+  UPLOADTHING_TOKEN: ""
+  WELCOME_PACK_JOIN_VIDEO_URL: ""
+  # --- telegram (SOGP) ---
+  TELEGRAM_SOGP_BOT_TOKEN: ""
+  TELEGRAM_SOGP_BOT_USERNAME: ""
+  TELEGRAM_SOGP_CHANNEL_ID: ""
+  TELEGRAM_SOGP_CHANNEL_URL: ""
+  TELEGRAM_SOGP_SIGNUP_CHAT_ID: ""
+  TELEGRAM_SOGP_WEBHOOK_SECRET: ""
+  TELEGRAM_SOGP_LINK_SECRET: ""
+  # --- dashboard feature flags (copy production values from Vercel) ---
+  DASHBOARD_DAILY_REPORTS_V2: "0"
+  DASHBOARD_CHURCH_V2: "0"
+  DASHBOARD_CHURCH_MULTI_BRANCH_V2: "0"
+  DASHBOARD_REPORTING_V3: ""
+  DASHBOARD_REPORTING_V3_SCHEMA: ""
+  DASHBOARD_SOGP_LEARNING_V3: ""
+  DASHBOARD_SOGP_LEARNING_V3_SCHEMA: ""
+  # Variables named PLEROS_*_REHEARSAL_ROOT / PLEROS_APPROVED_* / PLEROS_BASELINE_CAPTURE look like
+  # migration tooling, not runtime. Add them only if Vercel production has them set.

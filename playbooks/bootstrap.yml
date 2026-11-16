@@ -1,0 +1,44 @@
+---
+# FIRST RUN ONLY, on a fresh server, as root.
+# Creates the 'deploy' admin user with your SSH key, proves you can log in as it,
+# and only then turns off root login and password login (so you can't lock yourself out).
+- name: Bootstrap a fresh server
+  hosts: all
+  remote_user: root
+  gather_facts: true
+  tasks:
+    - name: Create the admin user
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        groups: sudo
+        append: true
+        shell: /bin/bash
+        create_home: true
+
+    - name: Authorize your SSH key for the admin user
+      ansible.posix.authorized_key:
+        user: "{{ admin_user }}"
+        key: "{{ lookup('ansible.builtin.file', admin_ssh_pubkey_file) }}"
+        exclusive: false
+
+    - name: Allow the admin user to use sudo without a password
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/90-{{ admin_user }}"
+        content: "{{ admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: visudo -cf %s
+
+    - name: Prove the admin user can log in with the key and use sudo (safety check)
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command: >-
+        ssh -i {{ admin_ssh_pubkey_file | regex_replace('\.pub$', '') }}
+        -p {{ ssh_port }}
+        -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15
+        {{ admin_user }}@{{ ansible_host }} sudo -n true
+      changed_when: false
+
+    - name: Harden SSH (key-only, no root login)
+      ansible.builtin.include_role:
+        name: hardening
+        tasks_from: ssh

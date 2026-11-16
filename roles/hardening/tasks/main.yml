@@ -1,0 +1,48 @@
+---
+- name: SSH hardening
+  ansible.builtin.import_tasks: ssh.yml
+
+- name: Firewall - deny incoming by default
+  community.general.ufw:
+    default: deny
+    direction: incoming
+
+- name: Firewall - allow SSH, HTTP, HTTPS (and HTTP/3)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop:
+    - { port: "{{ ssh_port }}", proto: tcp }
+    - { port: "80", proto: tcp }
+    - { port: "443", proto: tcp }
+    - { port: "443", proto: udp }
+
+- name: Firewall - enable
+  community.general.ufw:
+    state: enabled
+
+- name: Fail2ban - protect SSH from brute force
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.d/sshd.local
+    content: |
+      [sshd]
+      enabled = true
+      maxretry = 5
+      bantime = 1h
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Automatic security updates
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    mode: "0644"
+
+- name: Fail2ban running
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true

@@ -1,0 +1,16 @@
+---
+# Everything after bootstrap. Safe to re-run any time: it only changes what differs.
+- name: Configure the Pleros server
+  hosts: all
+  become: true
+  roles:
+    - role: base
+      tags: [base]
+    - role: hardening
+      tags: [hardening]
+    - role: docker
+      tags: [docker]
+    - role: app
+      tags: [app]
+    - role: cron
+      tags: [cron]

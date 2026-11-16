@@ -1,0 +1,36 @@
+# {{ ansible_managed }}
+{
+	email {{ acme_email }}
+}
+
+(pleros_site) {
+	encode zstd gzip
+
+	# Long cache for the SOGP welcome media (these rules lived in vercel.json "headers").
+	@sogp_media path /site/sogp/sogp-welcome-WaXgk9zqi78.mp4 /site/sogp/sogp-welcome-WaXgk9zqi78.jpg /site/sogp/sogp-welcome-square-20260831.mp4 /site/sogp/sogp-welcome-square-20260831.jpg
+	handle @sogp_media {
+		reverse_proxy app:{{ app_port }} {
+			header_down Cache-Control "public, max-age=31536000, immutable"
+		}
+	}
+
+	handle {
+		reverse_proxy app:{{ app_port }}
+	}
+}
+
+{{ staging_domain }} {
+	import pleros_site
+}
+{% if serve_production_domain | bool %}
+
+{{ app_domain }} {
+	import pleros_site
+}
+{% for alias in app_domain_aliases %}
+
+{{ alias }} {
+	redir https://{{ app_domain }}{uri} permanent
+}
+{% endfor %}
+{% endif %}

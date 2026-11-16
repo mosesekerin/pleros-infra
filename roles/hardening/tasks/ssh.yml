@@ -1,0 +1,15 @@
+---
+# Named 00-... so it wins: sshd uses the FIRST value it reads, and Ubuntu cloud images
+# ship 50-cloud-init.conf with "PasswordAuthentication yes".
+- name: SSH - key-only login, no root login
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/00-pleros-hardening.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PubkeyAuthentication yes
+      MaxAuthTries 3
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Restart ssh

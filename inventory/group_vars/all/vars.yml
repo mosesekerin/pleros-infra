@@ -1,0 +1,37 @@
+---
+# Non-secret settings. Secrets live in vault.yml (encrypted with ansible-vault).
+
+# --- server ---
+admin_user: deploy
+admin_ssh_pubkey_file: ~/.ssh/pleros_ed25519.pub
+server_timezone: Etc/UTC # Vercel cron schedules are UTC, so the server is UTC too
+swap_size_mb: 4096 # safety net for `next build` memory spikes
+ssh_port: 22
+
+# --- domains ---
+app_domain: pleros.org
+app_domain_aliases: [www.pleros.org] # redirected to app_domain
+staging_domain: new.pleros.org # used to test before switching DNS
+serve_production_domain: false # set true at cutover (Caddy then requests certs for pleros.org)
+acme_email: fccibado@gmail.com # Let's Encrypt expiry notices
+
+# --- application ---
+app_repo_url: https://github.com/pleros-ministries/pleros_org.git # public repo, no deploy key needed
+app_repo_version: main
+app_dir: /opt/pleros
+app_port: 3000
+app_node_image: node:22-bookworm-slim
+app_mem_limit: 3g # container memory cap so one app can't starve the server
+
+# --- cron jobs (from the app's vercel.json) ---
+# Keep disabled while testing on the staging domain; enable at cutover.
+cron_enabled: false
+cron_jobs:
+  - name: sogp-reminders
+    path: /api/cron/sogp-reminders
+    minute: "20"
+    hour: "4"
+  - name: reminder-dispatch
+    path: /api/cron/reminder-dispatch
+    minute: "*/5"
+    hour: "*"

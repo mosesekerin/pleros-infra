@@ -1,0 +1,53 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - htop
+      - jq
+      - ca-certificates
+      - gnupg
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ server_timezone }}"
+
+- name: Check for an existing swapfile
+  ansible.builtin.stat:
+    path: /swapfile
+  register: base_swapfile
+
+- name: Create swapfile
+  when: not base_swapfile.stat.exists
+  block:
+    - name: Allocate swapfile
+      ansible.builtin.command: "fallocate -l {{ swap_size_mb }}M /swapfile"
+      changed_when: true
+    - name: Secure swapfile permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+    - name: Format swapfile
+      ansible.builtin.command: mkswap /swapfile
+      changed_when: true
+    - name: Enable swapfile
+      ansible.builtin.command: swapon /swapfile
+      changed_when: true
+
+- name: Keep swap on after reboot
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "/swapfile none swap sw 0 0"
+
+- name: Prefer RAM over swap
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    value: "10"
+    state: present

@@ -1,0 +1,40 @@
+---
+# Recreates the Vercel cron jobs. Vercel called each path with GET and
+# "Authorization: Bearer $CRON_SECRET"; this does the same, from the server itself.
+- name: Secrets directory for cron
+  ansible.builtin.file:
+    path: /etc/pleros
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Cron secret (root-only)
+  ansible.builtin.copy:
+    dest: /etc/pleros/cron.env
+    content: "CRON_SECRET={{ vault_app_env.CRON_SECRET | quote }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Cron runner script
+  ansible.builtin.template:
+    src: pleros-cron.sh.j2
+    dest: /usr/local/bin/pleros-cron
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Cron schedule (enabled only when cron_enabled is true)
+  ansible.builtin.cron:
+    name: "pleros {{ item.name }}"
+    cron_file: pleros
+    user: root
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    job: "/usr/local/bin/pleros-cron {{ item.path }}"
+    state: "{{ 'present' if cron_enabled | bool else 'absent' }}"
+  loop: "{{ cron_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"

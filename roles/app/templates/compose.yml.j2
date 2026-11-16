@@ -1,0 +1,43 @@
+# {{ ansible_managed }}
+name: pleros
+
+services:
+  app:
+    build:
+      context: ./src
+      dockerfile: ../Dockerfile
+      secrets: [app_env]
+    image: pleros-app:latest
+    env_file: .env
+    restart: unless-stopped
+    mem_limit: {{ app_mem_limit }}
+    # Only reachable from the server itself (Caddy and cron); Caddy is the public door.
+    ports:
+      - "127.0.0.1:{{ app_port }}:{{ app_port }}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:{{ app_port }}/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+secrets:
+  app_env:
+    file: ./.env
+
+volumes:
+  caddy_data:
+  caddy_config:
