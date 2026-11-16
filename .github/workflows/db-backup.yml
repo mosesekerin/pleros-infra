@@ -1,0 +1,91 @@
+# Nightly backup of the Pleros Neon database.
+# Flow: schedule fires -> temporary runner -> install pg_dump 17 -> dump from Neon
+#       -> verify the dump file -> encrypt with gpg -> store as a GitHub artifact (30 days)
+# Any failed step stops the job, and GitHub emails you.
+
+name: Database backup
+
+on:
+  schedule:
+    - cron: "17 2 * * *"   # 02:17 UTC = 03:17 Lagos time, every day
+  workflow_dispatch: {}     # adds a "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PG_MAJOR: "17"
+
+    steps:
+      - name: Install PostgreSQL client ${{ env.PG_MAJOR }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}"
+          pg_dump --version
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_UNPOOLED }}
+        run: |
+          set -euo pipefail
+          [ -n "$DATABASE_URL" ] || { echo "::error::Secret NEON_DATABASE_URL_UNPOOLED is not set"; exit 1; }
+          case "$DATABASE_URL" in *-pooler*) echo "::error::Use the direct (non-pooled) connection string"; exit 1;; esac
+          STAMP="$(date -u +%Y%m%d-%H%MZ)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          mkdir -p backup
+          pg_dump "$DATABASE_URL" -Fc --no-owner --no-acl -f "backup/pleros-$STAMP.dump"
+          ls -lh backup/
+
+      - name: Verify dump against live database
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_UNPOOLED }}
+        run: |
+          set -euo pipefail
+          FILE="backup/pleros-$STAMP.dump"
+          [ -s "$FILE" ] || { echo "::error::Dump file is missing or empty"; exit 1; }
+          pg_restore --list "$FILE" | awk '$4=="TABLE" && $5=="DATA" {print $6"."$7}' | sort > dump_tables.txt
+          psql "$DATABASE_URL" -tAc "select table_schema||'.'||table_name from information_schema.tables where table_type='BASE TABLE' and table_schema not in ('pg_catalog','information_schema')" | sort > live_tables.txt
+          DUMP_COUNT=$(wc -l < dump_tables.txt)
+          LIVE_COUNT=$(wc -l < live_tables.txt)
+          echo "Tables in dump: $DUMP_COUNT | tables in live DB: $LIVE_COUNT"
+          [ "$DUMP_COUNT" -gt 0 ] || { echo "::error::Dump contains no table data"; exit 1; }
+          if ! diff dump_tables.txt live_tables.txt; then
+            echo "::error::Table list in dump does not match the live database"
+            exit 1
+          fi
+          echo "Verified: dump matches live database"
+
+      - name: Encrypt dump
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          [ -n "$BACKUP_PASSPHRASE" ] || { echo "::error::Secret BACKUP_PASSPHRASE is not set"; exit 1; }
+          FILE="backup/pleros-$STAMP.dump"
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 --symmetric --cipher-algo AES256 -o "$FILE.gpg" "$FILE"
+          shred -u "$FILE"
+          (cd backup && sha256sum "pleros-$STAMP.dump.gpg" > "pleros-$STAMP.dump.gpg.sha256")
+          ls -lh backup/
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: pleros-db-${{ env.STAMP }}
+          path: |
+            backup/*.gpg
+            backup/*.sha256
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
