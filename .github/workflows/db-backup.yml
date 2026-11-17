@@ -7,7 +7,8 @@ name: Database backup
 
 on:
   schedule:
-    - cron: "17 2 * * *"   # 02:17 UTC = 03:17 Lagos time, every day
+    - cron: "17 2 * * *"    # 02:17 UTC = 03:17 Lagos
+    - cron: "17 14 * * *"   # 14:17 UTC = 15:17 Lagos (second chance if GitHub drops one)
   workflow_dispatch: {}     # adds a "Run workflow" button in the Actions tab
 
 permissions:
@@ -92,3 +93,17 @@ jobs:
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
+
+      - name: Ping healthchecks (success)
+        if: success()
+        env:
+          HC_URL: ${{ secrets.HEALTHCHECK_PING_URL }}
+        run: |
+          [ -n "$HC_URL" ] || { echo "::error::Secret HEALTHCHECK_PING_URL is not set"; exit 1; }
+          curl -fsS -m 10 --retry 5 -o /dev/null "$HC_URL"
+
+      - name: Ping healthchecks (failure)
+        if: failure()
+        env:
+          HC_URL: ${{ secrets.HEALTHCHECK_PING_URL }}
+        run: curl -fsS -m 10 --retry 5 -o /dev/null "$HC_URL/fail"
